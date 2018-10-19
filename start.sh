@@ -17,7 +17,8 @@ NIFI_PORT=5443
 # Nifi keystore/truststore password
 # The password to the keystore.jks and truststore.jks
 #-------------------------------------------
-NIFI_STORE_PASS=fraunhofer
+NIFI_KEYSTORE_PASS=fraunhofer
+NIFI_TRUSTSTORE_PASS=fraunhofer
 
 #-------------------------------------------
 # General settings
@@ -40,17 +41,33 @@ if [ ! -f ./secrets/truststore.jks ]; then
     docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
         -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
         /usr/src/secrets/generate-truststore.sh \
-        "${DNAME}" "${NIFI_STORE_PASS}"
+        "${DNAME}" "${NIFI_TRUSTSTORE_PASS}"
     echo "Generation done! You can find the client PKCS12 file under:"
     echo "   ./secrets/client.p12"
     echo " "
 fi
 
 if [ ! -f ./secrets/keystore.jks ]; then
-    echo "keystore.jks does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
-    echo "[ERROR] No keystore.jks found. Launching aborted!"
-    echo " "
-    exit 1
+    echo "keystore.jks does not exist. Do you want to generate a new keystore with self-signed certificate?"
+    select yn in "Yes" "No"; do
+        case ${yn} in
+            Yes )
+                read -p "Please enter the subject of cert. It typically has the form \"CN=hostname,O=Fraunhofer FIT,C=DE\":" SERVER_CERT_SUBJECT
+                read -p "Please enter the password for the keystore: " NIFI_KEYSTORE_PASS
+                echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
+                docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
+                    -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
+                    /usr/src/secrets/generate-keystore.sh \
+                    "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
+                ;;
+            No )
+                echo "keystore.jks does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
+                echo "[ERROR] No keystore.jks found. Launching aborted!"
+                echo " "
+                exit 1
+                ;;
+        esac
+    done
 fi
 
 if [[ "$(docker images -q ${DOCKER_IMAGE_TAG} 2> /dev/null)" == "" ]]; then
