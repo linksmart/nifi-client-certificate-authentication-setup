@@ -19,30 +19,47 @@ NIFI_PORT=5443
 #-------------------------------------------
 NIFI_STORE_PASS=fraunhofer
 
+#-------------------------------------------
+# General settings
+#-------------------------------------------
+DOCKER_IMAGE_TAG=secure-nifi
+DOCKER_CONTAINER_NAME=secure-nifi
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Do not modify the lines below!
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-echo "========================================"
-echo "Starting a secure Nifi instance with certificate-based authentication"
-echo "========================================"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo "Secure Nifi with cert-based authentication"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
 
-# Add certificate to truststore
-docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
-    -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
-    /usr/src/secrets/generate-truststore.sh \
-    "${DNAME}" "${NIFI_STORE_PASS}"
-
+# Generate client key & cert and add cert to truststore
+if [ ! -f ./secrets/truststore.jks ]; then
+    echo "truststore.jks does not exist. Generating truststore.jks with new client cert"
+    docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
+        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
+        /usr/src/secrets/generate-truststore.sh \
+        "${DNAME}" "${NIFI_STORE_PASS}"
+    echo "Generation done! You can find the client PKCS12 file under:"
+    echo "   ./secrets/client.p12"
+    echo " "
+fi
 
 if [ ! -f ./secrets/keystore.jks ]; then
-    echo "[ERROR] keystore.jks is missing in ./secrets"
-    echo "Launching aborted"
+    echo "keystore.jks does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
+    echo "[ERROR] No keystore.jks found. Launching aborted!"
+    echo " "
     exit 1
 fi
 
-docker run --name secure-nifi -p ${NIFI_PORT}:8443 \
+if [[ "$(docker images -q ${DOCKER_IMAGE_TAG} 2> /dev/null)" == "" ]]; then
+  # If specified image tag doesn't exist, build the image
+  docker build -t ${DOCKER_IMAGE_TAG} .
+fi
+
+
+docker run --name ${DOCKER_CONTAINER_NAME} -p ${NIFI_PORT}:8443 \
     -v "${PWD}/secrets:/opt/secrets" \
     -e AUTH=tls \
     -e INITIAL_ADMIN_IDENTITY="${DNAME}" \
@@ -50,9 +67,9 @@ docker run --name secure-nifi -p ${NIFI_PORT}:8443 \
     -e KEYSTORE_TYPE=JKS \
     -e KEYSTORE_PASSWORD="${NIFI_STORE_PASS}" \
     -e TRUSTSTORE_PATH=/opt/secrets/truststore.jks \
-    -e TRUSTSTORE_PASSWORD=${NIFI_STORE_PASS} \
+    -e TRUSTSTORE_PASSWORD="${NIFI_STORE_PASS}" \
     -e TRUSTSTORE_TYPE=JKS \
     -e NIFI_WEB_PROXY_HOST=${NIFI_HOST}:${NIFI_PORT} \
     -e NIFI_WEB_HTTP_HOST=${NIFI_HOST} \
     -e NIFI_REMOTE_INPUT_HOST=${NIFI_HOST} \
-    apache/nifi:1.6.0
+    ${DOCKER_IMAGE_TAG}
