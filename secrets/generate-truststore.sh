@@ -20,5 +20,5 @@ keytool -importkeystore -srckeystore client_keystore.jks -destkeystore client.p1
 
 rm -f client_keystore.jks
 rm -f client.der
-chmod 640 client.p12
-chmod 640 truststore.jks
+chmod 644 client.p12
+chmod 644 truststore.jks
