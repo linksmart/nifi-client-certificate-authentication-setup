@@ -2,16 +2,15 @@
 
 This repository provides configuration for setting up a secure Nifi instance
 with client-side certificate-based authentication. Using this method, only 
-browsers with the trusted client certificate can visit the Nifi UI. Username
-password authentication is not allowed.
+browsers with the trusted client certificate can visit the Nifi UI. Username-password authentication is not allowed.
 
 ## Quick Start
-Run the starting script to start the container. You can modify some parameters
+Run the setup script to generate necessary configurations. You can modify some parameters
 inside this script:
 ```
 ./setup.sh
 ```
-The script will set up necessary files for you. 
+The script will set up necessary config files for you. 
 If you do not have a keystore under `./secrets`, it will also help you to generate a new one.
 After the script is run, you can now build the new Nifi image:
 ```bash
@@ -35,6 +34,16 @@ After Nifi has finished starting up, you can visit Nifi with the following URL:
 2. If you have configurations files to add to the Nifi instance, simply put them into `./nifi/conf`. Typically, you can put in the following files:
     - `flow.xml.gz`: this file contains the current processor setup on the Nifi canvas
     - `./templates/*.xml`: template files  
+
+3. The repository also comes with scripts to help you import existing cert file into truststore. Put your cert file (`DER` format) into `./secrets` and run the following command:
+    ```bash
+    docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
+        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
+        /usr/src/secrets/import-certificates.sh \
+        [cert file name] [truststore password]
+    ```
+    The above command will generate the `truststore.jks` in `./secrets`.
+
 
  ## Notes
  1. When you specify the `DNAME` environment variable in `./start.sh`, it is 
