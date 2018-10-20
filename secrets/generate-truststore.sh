@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/ash -e
 
 DNAME=$1
 PSWD=$2
