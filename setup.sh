@@ -53,7 +53,7 @@ if [ ! -f ./secrets/truststore.jks ]; then
 fi
 
 if [ ! -f ./secrets/keystore.jks ]; then
-    echo "keystore.jks does not exist. Do you want to generate a new keystore with self-signed certificate?"
+    echo "keystore.jks does not exist. Do you want to generate a new keystore with self-signed certificate? (Type the number before the option to choose):"
     select yn in "Yes" "No"; do
         case ${yn} in
             Yes )
@@ -64,6 +64,9 @@ if [ ! -f ./secrets/keystore.jks ]; then
                     -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
                     /usr/src/secrets/generate-keystore.sh \
                     "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
+                echo ${NIFI_KEYSTORE_PASS}
+                echo "Keystore generation finished!"
+                break
                 ;;
             No )
                 echo "keystore.jks does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
@@ -75,30 +78,28 @@ if [ ! -f ./secrets/keystore.jks ]; then
     done
 fi
 
+echo "Setting up .env file..."
 cat << EOF > ./.env
 AUTH=tls
-INITIAL_ADMIN_IDENTITY="${DNAME}"
+INITIAL_ADMIN_IDENTITY=${DNAME}
 KEYSTORE_PATH=/opt/secrets/keystore.jks
 KEYSTORE_TYPE=JKS
-KEYSTORE_PASSWORD="${NIFI_KEYSTORE_PASS}"
+KEYSTORE_PASSWORD=${NIFI_KEYSTORE_PASS}
 TRUSTSTORE_PATH=/opt/secrets/truststore.jks
-TRUSTSTORE_PASSWORD="${NIFI_TRUSTSTORE_PASS}"
+TRUSTSTORE_PASSWORD=${NIFI_TRUSTSTORE_PASS}
 TRUSTSTORE_TYPE=JKS
 NIFI_WEB_PROXY_HOST=${NIFI_HOST}:${NIFI_PORT}
 NIFI_WEB_HTTP_HOST=${NIFI_HOST}
 NIFI_REMOTE_INPUT_HOST=${NIFI_HOST}
 EOF
 
-docker run --name ${DOCKER_CONTAINER_NAME} -p ${NIFI_PORT}:8443 \
-    -e AUTH=tls \
-    -e INITIAL_ADMIN_IDENTITY="${DNAME}" \
-    -e KEYSTORE_PATH=/opt/secrets/keystore.jks \
-    -e KEYSTORE_TYPE=JKS \
-    -e KEYSTORE_PASSWORD="${NIFI_KEYSTORE_PASS}" \
-    -e TRUSTSTORE_PATH=/opt/secrets/truststore.jks \
-    -e TRUSTSTORE_PASSWORD="${NIFI_STORE_PASS}" \
-    -e TRUSTSTORE_TYPE=JKS \
-    -e NIFI_WEB_PROXY_HOST=${NIFI_HOST}:${NIFI_PORT} \
-    -e NIFI_WEB_HTTP_HOST=${NIFI_HOST} \
-    -e NIFI_REMOTE_INPUT_HOST=${NIFI_HOST} \
-    ${DOCKER_IMAGE_TAG}
+echo "~~~~~~~~~~~~~~~~~~~~~~~"
+echo "Setup is done! You can now run:"
+echo " "
+echo "    docker build -t secure-nifi ."
+echo " "
+echo "to build the image. Then use this command to run the container:"
+echo " "
+echo "    docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi" 
+echo " "
+echo "Happy coding!"
