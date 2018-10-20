@@ -30,9 +30,9 @@ DOCKER_CONTAINER_NAME=secure-nifi
 # Do not modify the lines below!
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo "------------------------------------------"
 echo "Secure Nifi with cert-based authentication"
-echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo "------------------------------------------"
 
 # If an old .env file exists, remove it
 if [ -f ./.env ]; then
@@ -102,7 +102,9 @@ NIFI_REMOTE_INPUT_HOST=${NIFI_HOST}
 EOF
 
 echo "~~~~~~~~~~~~~~~~~~~~~~~"
-echo "Setup is done! You can now run:"
+echo "Setup is done!"
+echo "~~~~~~~~~~~~~~~~~~~~~~~"
+echo "You can now run:"
 echo " "
 echo "  docker build -t secure-nifi ."
 echo " "
@@ -116,6 +118,6 @@ echo "  ./secrets/client.p12"
 echo " "
 echo "After importing, you can visit https://${NIFI_HOST}:${NIFI_PORT}/nifi for the UI."
 echo " "
-echo "Happy coding!"
+echo "Happy flowing!"
 echo " "
 echo " "
