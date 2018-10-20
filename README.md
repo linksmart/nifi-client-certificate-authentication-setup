@@ -9,15 +9,24 @@ password authentication is not allowed.
 Run the starting script to start the container. You can modify some parameters
 inside this script:
 ```
-./start.sh
+./setup.sh
+```
+The script will set up necessary files for you. 
+If you do not have a keystore under `./secrets` After the image is built, it will also ask help you to generate a new one.
+After the script is run, you can now build the new Nifi image:
+```bash
+docker build -t secure-nifi .
 ```
 
-TODO: ask user in script whether to generate certificate
+you can run it by using the following command:
+```bash
+docker run --name secure-nifi --env-file ./.env -p [port]:8443 --detach secure-nifi
+```
+the variable `port` is the one you specified in `./setup.sh`  
 
-After Nifi has finished starting up, you can visit Nifi with the following URL
- (port may be different depending on your configuration):
+After Nifi has finished starting up, you can visit Nifi with the following URL:
  ```
- https://localhost:5443/nifi
+ https://localhost:[port]/nifi
  ```
  
 ## Advanced

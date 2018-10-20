@@ -34,6 +34,11 @@ echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo "Secure Nifi with cert-based authentication"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
+# If an old .env file exists, remove it
+if [ -f ./.env ]; then
+    rm -f ./.env
+fi
+
 
 # Generate client key & cert and add cert to truststore
 if [ ! -f ./secrets/truststore.jks ]; then
@@ -70,19 +75,26 @@ if [ ! -f ./secrets/keystore.jks ]; then
     done
 fi
 
-if [[ "$(docker images -q ${DOCKER_IMAGE_TAG} 2> /dev/null)" == "" ]]; then
-  # If specified image tag doesn't exist, build the image
-  docker build -t ${DOCKER_IMAGE_TAG} .
-fi
-
+cat << EOF > ./.env
+AUTH=tls
+INITIAL_ADMIN_IDENTITY="${DNAME}"
+KEYSTORE_PATH=/opt/secrets/keystore.jks
+KEYSTORE_TYPE=JKS
+KEYSTORE_PASSWORD="${NIFI_KEYSTORE_PASS}"
+TRUSTSTORE_PATH=/opt/secrets/truststore.jks
+TRUSTSTORE_PASSWORD="${NIFI_TRUSTSTORE_PASS}"
+TRUSTSTORE_TYPE=JKS
+NIFI_WEB_PROXY_HOST=${NIFI_HOST}:${NIFI_PORT}
+NIFI_WEB_HTTP_HOST=${NIFI_HOST}
+NIFI_REMOTE_INPUT_HOST=${NIFI_HOST}
+EOF
 
 docker run --name ${DOCKER_CONTAINER_NAME} -p ${NIFI_PORT}:8443 \
-    -v "${PWD}/secrets:/opt/secrets" \
     -e AUTH=tls \
     -e INITIAL_ADMIN_IDENTITY="${DNAME}" \
     -e KEYSTORE_PATH=/opt/secrets/keystore.jks \
     -e KEYSTORE_TYPE=JKS \
-    -e KEYSTORE_PASSWORD="${NIFI_STORE_PASS}" \
+    -e KEYSTORE_PASSWORD="${NIFI_KEYSTORE_PASS}" \
     -e TRUSTSTORE_PATH=/opt/secrets/truststore.jks \
     -e TRUSTSTORE_PASSWORD="${NIFI_STORE_PASS}" \
     -e TRUSTSTORE_TYPE=JKS \
