@@ -43,13 +43,16 @@ fi
 # Generate client key & cert and add cert to truststore
 if [ ! -f ./secrets/truststore.jks ]; then
     echo "truststore.jks does not exist. Generating truststore.jks with new client cert"
+    echo "---------------------------------------------"
+    echo "Generating truststore with subject field: ${DNAME}"
+    echo "---------------------------------------------"
     docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
         -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
         /usr/src/secrets/generate-truststore.sh \
         "${DNAME}" "${NIFI_TRUSTSTORE_PASS}"
-    echo "Generation done! You can find the client PKCS12 file under:"
-    echo "   ./secrets/client.p12"
-    echo " "
+    echo "---------------------------------------------"
+    echo "Truststore generation finished!"
+    echo "---------------------------------------------"
 fi
 
 if [ ! -f ./secrets/keystore.jks ]; then
@@ -58,14 +61,19 @@ if [ ! -f ./secrets/keystore.jks ]; then
         case ${yn} in
             Yes )
                 read -p "Please enter the subject of cert. It typically has the form \"CN=hostname,O=Fraunhofer FIT,C=DE\":" SERVER_CERT_SUBJECT
-                read -p "Please enter the password for the keystore: " NIFI_KEYSTORE_PASS
+                echo -n "Please enter the password for the keystore: "
+                read -s NIFI_KEYSTORE_PASS
+                echo " "
+                echo "---------------------------------------------"
                 echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
+                echo "---------------------------------------------"
                 docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
                     -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
                     /usr/src/secrets/generate-keystore.sh \
                     "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
-                echo ${NIFI_KEYSTORE_PASS}
+                echo "---------------------------------------------"
                 echo "Keystore generation finished!"
+                echo "---------------------------------------------"
                 break
                 ;;
             No )
@@ -96,10 +104,18 @@ EOF
 echo "~~~~~~~~~~~~~~~~~~~~~~~"
 echo "Setup is done! You can now run:"
 echo " "
-echo "    docker build -t secure-nifi ."
+echo "  docker build -t secure-nifi ."
 echo " "
 echo "to build the image. Then use this command to run the container:"
 echo " "
-echo "    docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi" 
+echo "  docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi"
+echo " "
+echo "To visit the Nifi UI, you need to import the client key into your browser. The key file is located in:"
+echo " "
+echo "  ./secrets/client.p12"
+echo " "
+echo "After importing, you can visit https://${NIFI_HOST}:${NIFI_PORT}/nifi for the UI."
 echo " "
 echo "Happy coding!"
+echo " "
+echo " "
