@@ -4,7 +4,7 @@
 # DNAME of client certificate
 # IMPORTANT: the empty space between different components is NECESSARY!
 #-------------------------------------------
-DNAME="CN=john.doe, OU=example, O=Fraunhofer FIT, L=Sankt Augustin, ST=Nordrhein Westfalen, C=DE"
+DNAME="CN=username, OU=NIFI"
 
 #-------------------------------------------
 # The hostname of the container host machine and the forwarded port to Nifi web interface
@@ -39,46 +39,42 @@ if [ -f ./.env ]; then
     rm -f ./.env
 fi
 
-
-# Generate client key & cert and add cert to truststore
-if [ ! -f ./secrets/truststore.jks ]; then
-    echo "truststore.jks does not exist. Generating truststore.jks with new client cert"
-    echo "---------------------------------------------"
-    echo "Generating truststore with subject field: ${DNAME}"
-    echo "---------------------------------------------"
-    docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
-        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
-        /usr/src/secrets/generate-truststore.sh \
-        "${DNAME}" "${NIFI_TRUSTSTORE_PASS}"
-    echo "---------------------------------------------"
-    echo "Truststore generation finished!"
-    echo "---------------------------------------------"
-fi
-
-if [ ! -f ./secrets/keystore.jks ]; then
-    echo "keystore.jks does not exist. Do you want to generate a new keystore with self-signed certificate? (Type the number before the option to choose):"
+# Check if both keystore.jks and truststore.jks exist
+# If no, then offer to generate new one
+if [ ! -z ./secrets/keystore.jks -o ! -z ./secrets/truststore.jks ]; then
+    echo "keystore.jks or truststore.jks does not exist. Do you want to generate new one? The existing keystore.jks or truststore.jks will be overwritten (type the number before option to choose):"
     select yn in "Yes" "No"; do
         case ${yn} in
             Yes )
-                read -p "Please enter the subject of cert. It typically has the form \"CN=hostname,O=Fraunhofer FIT,C=DE\":" SERVER_CERT_SUBJECT
-                echo -n "Please enter the password for the keystore: "
-                read -s NIFI_KEYSTORE_PASS
-                echo " "
+                # Generate certificate with Nifi toolkit
                 echo "---------------------------------------------"
-                echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
+                echo "Generating keystore.jks, truststore.jks and client key"
                 echo "---------------------------------------------"
-                docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
-                    -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
-                    /usr/src/secrets/generate-keystore.sh \
-                    "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
+                docker run --name dummy-toolkit apache/nifi-toolkit:1.6.0 \
+                    ./bin/tls-toolkit.sh standalone \
+                    -n "${NIFI_HOST}" \
+                    -S "${NIFI_KEYSTORE_PASS}" \
+                    -P "${NIFI_TRUSTSTORE_PASS}" \
+                    -C "${DNAME}" \
+                    --nifiDnSuffix "OU=Nifi" \ # TODO: make it a parameter
+                    -o /opt/nifi/nifi-1.6.0/conf
+                if [ $? != 0 ]; then    # If previous command failed
+                    docker rm dummy-toolkitecho
+                    echo "[ERROR] Keystore/truststore generation failed! "
+                    echo "------ Launching aborted ------"
+                    echo " "
+                    exit 1
+                fi
+                docker cp dummy-toolkit:/opt/nifi/nifi-1.6.0/conf/. ./secrets
+                docker rm dummy-toolkit
+                mv  ./secrets/${NIFI_HOST} ./secrets/server
                 echo "---------------------------------------------"
                 echo "Keystore generation finished!"
                 echo "---------------------------------------------"
-                break
                 ;;
             No )
-                echo "keystore.jks does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
-                echo "[ERROR] No keystore.jks found. Launching aborted!"
+                echo "[ERROR] keystore.jks or truststore does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
+                echo "------ Launching aborted ------"
                 echo " "
                 exit 1
                 ;;
