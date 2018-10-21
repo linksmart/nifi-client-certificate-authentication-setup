@@ -1,89 +1,63 @@
 #!/bin/bash -e
 
-#-------------------------------------------
-# DNAME of client certificate
-# IMPORTANT: the empty space between different components is NECESSARY!
-#-------------------------------------------
-DNAME="CN=john.doe, OU=example, O=Fraunhofer FIT, L=Sankt Augustin, ST=Nordrhein Westfalen, C=DE"
-
-#-------------------------------------------
-# The hostname of the container host machine and the forwarded port to Nifi web interface
-# These parameters allows a secure Nifi to accept HTTP request sent to ${NIFI_HOST}:${NIFI_PORT}, useful when Nifi is running behind a proxy or in a container.
-#-------------------------------------------
-NIFI_HOST=ucc-ipc-0
-NIFI_PORT=5443
-
-#-------------------------------------------
-# Nifi keystore/truststore password
-# The password to the keystore.jks and truststore.jks
-#-------------------------------------------
-NIFI_KEYSTORE_PASS=fraunhofer
-NIFI_TRUSTSTORE_PASS=fraunhofer
-
-#-------------------------------------------
-# General settings
-#-------------------------------------------
-DOCKER_IMAGE_TAG=secure-nifi
-DOCKER_CONTAINER_NAME=secure-nifi
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Do not modify the lines below!
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 echo "------------------------------------------"
 echo "Secure Nifi with cert-based authentication"
 echo "------------------------------------------"
+
+# Function to generate random password
+gen_pass(){
+    echo $(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+}
 
 # If an old .env file exists, remove it
 if [ -f ./.env ]; then
     rm -f ./.env
 fi
 
+read -p "The hostname of the machine running Nifi container:\n" NIFI_HOST
+read -p "The host's forwarded port to the Nifi UI:\n" NIFI_PORT
 
 # Generate client key & cert and add cert to truststore
 if [ ! -f ./secrets/truststore.jks ]; then
-    echo "truststore.jks does not exist. Generating truststore.jks with new client cert"
+    echo "truststore.jks does not exist. Generating new truststore.jks"
+    echo "Please enter the subject of cert. It typically has the form \"CN=user, OU=nifi\""
+    read -p "IMPORTANT: the SPACE between components must be provided as the example above:\n" DNAME
     echo "---------------------------------------------"
     echo "Generating truststore with subject field: ${DNAME}"
     echo "---------------------------------------------"
+    NIFI_TRUSTSTORE_PASS=gen_pass
+    echo -n "Please provide password for the client-side PCKS12 file: "
+    read -s PKCS12_PASS
     docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
         -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
         /usr/src/secrets/generate-truststore.sh \
-        "${DNAME}" "${NIFI_TRUSTSTORE_PASS}"
+        "${DNAME}" "${NIFI_TRUSTSTORE_PASS}" "${PKCS12_PASS}"
     echo "---------------------------------------------"
     echo "Truststore generation finished!"
     echo "---------------------------------------------"
+else
+    echo -n "truststore.jks detected. Please provide the password for the the truststore: "
+    read -s NIFI_TRUSTSTORE_PASS
 fi
 
 if [ ! -f ./secrets/keystore.jks ]; then
-    echo "keystore.jks does not exist. Do you want to generate a new keystore with self-signed certificate? (Type the number before the option to choose):"
-    select yn in "Yes" "No"; do
-        case ${yn} in
-            Yes )
-                read -p "Please enter the subject of cert. It typically has the form \"CN=hostname,O=Fraunhofer FIT,C=DE\":" SERVER_CERT_SUBJECT
-                echo -n "Please enter the password for the keystore: "
-                read -s NIFI_KEYSTORE_PASS
-                echo " "
-                echo "---------------------------------------------"
-                echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
-                echo "---------------------------------------------"
-                docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
-                    -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
-                    /usr/src/secrets/generate-keystore.sh \
-                    "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
-                echo "---------------------------------------------"
-                echo "Keystore generation finished!"
-                echo "---------------------------------------------"
-                break
-                ;;
-            No )
-                echo "keystore.jks does not exist. Please provides your keystore in ./secrets, or use the provided script to generate a new one"
-                echo "[ERROR] No keystore.jks found. Launching aborted!"
-                echo " "
-                exit 1
-                ;;
-        esac
-    done
+    echo "keystore.jks does not exist. Generating new keystore."
+    read -p "Please enter the subject of cert. It typically has the form \"CN=[hostname],OU=nifi\":" SERVER_CERT_SUBJECT
+    NIFI_KEYSTORE_PASS=gen_pass
+    echo " "
+    echo "---------------------------------------------"
+    echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
+    echo "---------------------------------------------"
+    docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
+        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
+        /usr/src/secrets/generate-keystore.sh \
+        "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
+    echo "---------------------------------------------"
+    echo "Keystore generation finished!"
+    echo "---------------------------------------------"
+else
+    echo -n "keystore.jks detected. Please provide the password for the the keystore: "
+    read -s NIFI_KEYSTORE_PASS
 fi
 
 echo "Setting up .env file..."
