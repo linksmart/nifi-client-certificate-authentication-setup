@@ -1,8 +1,10 @@
 #!/bin/bash -e
 
-echo "------------------------------------------"
-echo "Secure Nifi with cert-based authentication"
-echo "------------------------------------------"
+echo " ----------------------------------------------"
+echo "|                                              |"
+echo "|  Secure Nifi with cert-based authentication  |"
+echo "|                                              |"
+echo " ----------------------------------------------"
 
 # Function to generate random password
 gen_pass(){
@@ -14,18 +16,18 @@ if [ -f ./.env ]; then
     rm -f ./.env
 fi
 
-read -p "The hostname of the machine running Nifi container:\n" NIFI_HOST
-read -p "The host's forwarded port to the Nifi UI:\n" NIFI_PORT
+read -p "The hostname of the machine running Nifi container:" NIFI_HOST
+read -p "The host's forwarded port to the Nifi UI: " NIFI_PORT
 
 # Generate client key & cert and add cert to truststore
 if [ ! -f ./secrets/truststore.jks ]; then
     echo "truststore.jks does not exist. Generating new truststore.jks"
     echo "Please enter the subject of cert. It typically has the form \"CN=user, OU=nifi\""
-    read -p "IMPORTANT: the SPACE between components must be provided as the example above:\n" DNAME
+    read -p "IMPORTANT: the SPACE between components must be provided as the example above:" DNAME
     echo "---------------------------------------------"
     echo "Generating truststore with subject field: ${DNAME}"
     echo "---------------------------------------------"
-    NIFI_TRUSTSTORE_PASS=gen_pass
+    NIFI_TRUSTSTORE_PASS=$(gen_pass)
     echo -n "Please provide password for the client-side PCKS12 file: "
     read -s PKCS12_PASS
     docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
@@ -38,12 +40,13 @@ if [ ! -f ./secrets/truststore.jks ]; then
 else
     echo -n "truststore.jks detected. Please provide the password for the the truststore: "
     read -s NIFI_TRUSTSTORE_PASS
+    echo " "
 fi
 
 if [ ! -f ./secrets/keystore.jks ]; then
     echo "keystore.jks does not exist. Generating new keystore."
     read -p "Please enter the subject of cert. It typically has the form \"CN=[hostname],OU=nifi\":" SERVER_CERT_SUBJECT
-    NIFI_KEYSTORE_PASS=gen_pass
+    NIFI_KEYSTORE_PASS=$(gen_pass)
     echo " "
     echo "---------------------------------------------"
     echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
@@ -58,6 +61,7 @@ if [ ! -f ./secrets/keystore.jks ]; then
 else
     echo -n "keystore.jks detected. Please provide the password for the the keystore: "
     read -s NIFI_KEYSTORE_PASS
+    echo " "
 fi
 
 echo "Setting up .env file..."
@@ -90,7 +94,9 @@ echo "To visit the Nifi UI, you need to import the client key into your browser.
 echo " "
 echo "  ./secrets/client.p12"
 echo " "
-echo "After importing, you can visit https://${NIFI_HOST}:${NIFI_PORT}/nifi for the UI."
+echo "After importing, you can visit the following URL for the Nifi UI:
+echo " "
+echo "  https://${NIFI_HOST}:${NIFI_PORT}/nifi"
 echo " "
 echo "Happy flowing!"
 echo " "
