@@ -17,6 +17,7 @@ if [ ! -f ./secrets/keystore.jks ]; then
     rm -f external_truststore.jks
     echo -n "Generating a truststore for EXTERNAL usage from this keystore. Please provide password for this truststore: "
     read -s EXTERNAL_TRUSTSTORE_PSWD
+    echo " "
     keytool -export -keystore keystore.jks -alias nifi -file external.der -storepass "${KEYSTORE_PSWD}"
     keytool -import -file external.der -alias nifi -keystore external_truststore.jks -storepass "${EXTERNAL_TRUSTSTORE_PSWD}" -noprompt
 
@@ -42,6 +43,7 @@ if [ ! -f ./truststore.jks ]; then
     # Export certificate and put it into truststore
     echo -n "Generating a PKCS12 file for client. Please provide password for this PCKS12 file: "
     read -s PKCS12_PSWD
+    echo " "
     keytool -export -keystore client_keystore.jks -alias client -file client.der -storepass "${TRUSTSTORE_PSWD}"
     keytool -import -file client.der -alias client -keystore truststore.jks -storepass "${TRUSTSTORE_PSWD}" -noprompt
 
