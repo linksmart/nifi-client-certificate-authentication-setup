@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/bin/bash -e
+
+echo " ----------------------------------------------"
+echo "|                                              |"
+echo "|  Secure Nifi with cert-based authentication  |"
+echo "|                                              |"
+echo " ----------------------------------------------"
 
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -18,20 +24,28 @@ key="$1"
         shift # past argument
         shift # past value
         ;;
-        -k|--keystore)
+        --keystore)
         KEYSTORE="$2"
         shift # past argument
         shift # past value
+        ;;
+        --new-keystore)
+        NEW_KEYSTORE=YES
+        shift # past argument
         ;;
         --key-pass)
         KEYSTORE_PASS="$2"
         shift # past argument
         shift # past value
         ;;
-        -t|--truststore)
+        --truststore)
         TRUSTSTORE="$2"
         shift # past argument
         shift # past value
+        ;;
+        --new-truststore)
+        NEW_TRUSTSTORE=YES
+        shift # past argument
         ;;
         --trust-pass)
         TRUSTSTORE_PASS="$2"
@@ -71,28 +85,34 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
 print_help(){
-    # TODO: print out help
-    cat << EOF
-This script generate appropriate configuration and keystore/truststore for a secure Nifi instance.
+    echo << EOF
 
-USAGE: ./setup.sh [OPTIONS]
-Example: ./setup.sh -n host-01 -p 8443 -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
+    This script generate appropriate configuration and keystore/truststore for a secure Nifi instance.
 
-OPTIONS:
+    USAGE: ./setup.sh [OPTIONS]
 
-    -h, --help:               Show the help message.
-    -n, --hostname HOSTNAME:  Required. The hostname of machine hosting the Nifi container.
-    -p, --port PORT:          Required. The forwarded port to the Nifi UI.
-    -k, --keystore FILE:      Optional. The keystore file to be used in Nifi. If this argument is set, --keypass must also be set. If not specified, a new one will be generated.
-    --keypass PASSWORD:       Optional. The password to keystore. If -k is not specified, this will be the password for the new generated keystore.If not specified, a random one will be used.
-    -t, --truststore FILE:    Optional. The truststore file to be used in Nifi. If this argument is set, --trustpass must also be set. If not specified, a new one will be generated.
-    --trustpass PASSWORD:     Optional. The password to keystore. If -t is not specified, this will be the password for the new generated truststore. If not specified, a random one will be used.
-    --ext-trust:              Optional. Whether to generate a truststore from the keystore, which is intended to be used by another Nifi instance to communicate with this one.
-    --ext-pass PASSWORD:      Optional. The password to the external truststore. If not specified, a random one is used.
-    --client-pass PASSWORD:   Optional. The password to the client key file. If not specified, a random one is used.
-    -s, --server-dn DN:       Optional. The Distinguish Name of the server certificate in keystore (Default: CN=[HOSTNAME],OU=nifi).
-    -c, --client-dn DN:       Optional. The Distinguish Name of the client certificate in truststore (Default: CN=user ,OU=nifi).
+    Example: ./setup.sh -n host-01 -p 8443 -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
+
+    OPTIONS:
+
 EOF
+    echo << EOF | column -s"|" -t
+    -h, --help:|Show the help message.
+    -n, --hostname HOSTNAME:|Required. The hostname of machine hosting the Nifi container.
+    -p, --port PORT:|Required. The forwarded port to the Nifi UI.
+    --keystore FILE:|Optional. The keystore file to be used in Nifi. If this argument is set, --keypass must also be set.
+    --new-keystore:|Optional. Create new keystore. Either this flag or --keystore must be specified.
+    --keypass PASSWORD:|Optional. The password to specified keystore or the newly generated one. Must be specified when --keystore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
+    --truststore FILE:|Optional. The truststore file to be used in Nifi. If this argument is set, --trustpass must also be set.
+    --new-truststore:|Optional. Create new truststore. Either this flag or --truststore must be specified.
+    --trustpass PASSWORD:|Optional. The password to the specified truststore or the newly generated one. Must be specified when --truststore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
+    --ext-trust:|Optional. Whether to generate a truststore from the keystore, which is intended to be used by another Nifi instance to communicate securely with this one.
+    --ext-pass PASSWORD:|Optional. The password to the external truststore. If not specified, a random one is used.
+    --client-pass PASSWORD:|Optional. The password to the client key file. If not specified, a random one is used.
+    -s, --server-dn DN:|Optional. The Distinguish Name of the server certificate in keystore (Default: CN=[HOSTNAME],OU=nifi).
+    -c, --client-dn DN:|Optional. The Distinguish Name of the client certificate in truststore. MUST use SPACES to separate domain components (Default: CN=user ,OU=nifi).
+EOF
+
 }
 
 gen_pass(){
@@ -124,12 +144,12 @@ if [ ! -z "${TRUSTSTORE}" -a -z "${TRUSTSTORE_PASS}" ]; then
     print_help
     exit 1
 fi
-if [ -f ./secrets/keystore.jks -a -z "${KEYSTORE_PASS}" ]; then
-    echo "[ERROR] keystore exists but no password is given"
+if [ -z "${KEYSTORE}" -a -z "${NEW_KEYSTORE}" ]; then
+    echo "[ERROR] Either --keystore or --new-keystore must be specified"
     exit 1
 fi
-if [ -f ./secrets/truststore.jks -a -z "${TRUSTSTORE_PASS}" ]; then
-    echo "[ERROR] truststore exists but no password is given"
+if [ -z "${TRUSTSTORE}" -a -z "${NEW_TRUSTSTORE}" ]; then
+    echo "[ERROR] Either --truststore or --new-truststore must be specified"
     exit 1
 fi
 if [ ! -z "${KEYSTORE}" -a ! -f "${KEYSTORE}" ]; then
@@ -140,9 +160,28 @@ if [ ! -z "${TRUSTSTORE}" -a ! -f "${TRUSTSTORE}" ]; then
     echo "[ERROR] ${TRUSTSTORE} does not exist."
     exit 1
 fi
-if [ \( -f ./secrets/keystore.jks -a ! -z "${KEYSTORE}" \) -o \( -f ./secrets/truststore.jks -a ! -z "${TRUSTSTORE}" \) ]; then
-    echo "[ERROR] Keystore or truststore specified, but they already exists in ./secrets. Please remove the ones in ./secrets before continuing"
-    exit 1
+
+# If both --keystore and --new-keystore is specified, ignore --new-keystore
+if [ ! -z "${KEYSTORE}" -o ! -z "${NEW_KEYSTORE}" ]; then
+    unset NEW_KEYSTORE
+fi
+if [ ! -z "${TRUSTSTORE}" -o ! -z "${NEW_TRUSTSTORE}" ]; then
+    unset NEW_TRUSTSTORE
+fi
+
+if [ ! -z "${NEW_KEYSTORE}" ]; then
+    rm -f ./secrets/keystore.jks
+fi
+if [ ! -z "${NEW_TRUSTSTORE}" ]; then
+    rm -f ./secrets/truststore.jks
+fi
+
+# Prepare files
+if [ ! -z "${KEYSTORE}" ]; then
+    mv -f "${KEYSTORE}" ./secrets/keystore.jks
+fi
+if [ ! -z "${TRUSTSTORE}" ]; then
+    mv -f "${TRUSTSTORE}" ./secrets/truststore.jks
 fi
 
 # Give default values
@@ -155,20 +194,12 @@ fi
 : ${CLIENT_PASS:=$(gen_pass)}
 
 # Generate keystore/truststore
-if [ ! -z "${KEYSTORE}" ]; then
-    mv -f "${KEYSTORE}" ./secrets/keystore.jks
-fi
-
-if [ ! -z "${TRUSTSTORE}" ]; then
-    mv -f "${TRUSTSTORE}" ./secrets/truststore.jks
-fi
-
 docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
         -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
         /usr/src/secrets/generate-non-interactive.sh \
         "${SERVER_DN}" "${KEYSTORE_PASS}" \
         "${CLIENT_DN}" "${TRUSTSTORE_PASS}" \
-        "${GENERATE_EXT_TRUSTSTORE}"  "${EXT_TRUSTSTORE_PASS}" \
+        "${GENERATE_EXT_TRUSTSTORE}" "${EXT_TRUSTSTORE_PASS}" \
         "${CLIENT_PASS}"
 
 
@@ -187,26 +218,27 @@ NIFI_WEB_HTTP_HOST=${NIFI_HOST}
 NIFI_REMOTE_INPUT_HOST=${NIFI_HOST}
 EOF
 
+echo << EOF
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            Setup is done!
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You can now run:
 
-echo "~~~~~~~~~~~~~~~~~~~~~~~"
-echo "  Setup is done!"
-echo "~~~~~~~~~~~~~~~~~~~~~~~"
-echo "You can now run:"
-echo " "
-echo "   docker build -t secure-nifi ."
-echo " "
-echo "to build the image. Then use this command to run the container:"
-echo " "
-echo "   docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi"
-echo " "
-echo "To visit the Nifi UI, you need to import the client key into your browser. The key file is located in:"
-echo " "
-echo "   ./secrets/client.p12"
-echo " "
-echo "After importing, you can visit the following URL for the Nifi UI:"
-echo " "
-echo "   https://${NIFI_HOST}:${NIFI_PORT}/nifi"
-echo " "
-echo "Happy flowing!"
-echo " "
-echo " "
+   docker build -t secure-nifi .
+
+to build the image. Then run the container:
+
+   docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi
+
+To visit the Nifi UI, you need to import the client key into your browser. The key file is located in:
+
+   ./secrets/client.p12
+
+After importing, you can visit the following URL for the Nifi UI:
+
+   https://${NIFI_HOST}:${NIFI_PORT}/nifi
+
+Happy flowing!
+
+
+EOF

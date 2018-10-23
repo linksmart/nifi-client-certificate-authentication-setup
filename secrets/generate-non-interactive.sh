@@ -8,6 +8,8 @@ GENERATE_EXT_TRUSTSTORE=$5
 EXT_TRUSTSTORE_PSWD=$6
 CLIENT_PSWD=$7
 
+echo "--------- Processing keystore/truststore ---------"
+
 if [ ! -f ./secrets/keystore.jks ]; then
     echo "keystore.jks does not exist. Generating new keystore."
     echo "*** Generating keystore with certificate \"${SERVER_DNAME}\" ***"
@@ -57,6 +59,7 @@ if [ ! -f ./truststore.jks ]; then
     chmod 640 truststore.jks
 fi
 
+echo "--------- Processing finished ---------"
 
 
 
