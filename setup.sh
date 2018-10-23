@@ -19,55 +19,34 @@ fi
 read -p "The hostname of the machine running Nifi container:" NIFI_HOST
 read -p "The host's forwarded port to the Nifi UI: " NIFI_PORT
 
-# Generate client key & cert and add cert to truststore
-if [ ! -f ./secrets/truststore.jks ]; then
-    echo "truststore.jks does not exist. Generating new truststore.jks"
-    echo "Please enter the subject of cert. It typically has the form \"CN=user, OU=nifi\""
-    read -p "IMPORTANT: the SPACE between components must be provided as the example above:" DNAME
-    echo "---------------------------------------------"
-    echo "Generating truststore with subject field: ${DNAME}"
-    echo "---------------------------------------------"
-    NIFI_TRUSTSTORE_PASS=$(gen_pass)
-    echo -n "Please provide password for the client-side PCKS12 file: "
-    read -s PKCS12_PASS
-    docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
-        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
-        /usr/src/secrets/generate-truststore.sh \
-        "${DNAME}" "${NIFI_TRUSTSTORE_PASS}" "${PKCS12_PASS}"
-    echo "---------------------------------------------"
-    echo "Truststore generation finished!"
-    echo "---------------------------------------------"
-else
-    echo -n "truststore.jks detected. Please provide the password for the the truststore: "
-    read -s NIFI_TRUSTSTORE_PASS
-    echo " "
-fi
-
-if [ ! -f ./secrets/keystore.jks ]; then
-    echo "keystore.jks does not exist. Generating new keystore."
-    read -p "Please enter the subject of cert. It typically has the form \"CN=[hostname],OU=nifi\":" SERVER_CERT_SUBJECT
-    NIFI_KEYSTORE_PASS=$(gen_pass)
-    echo " "
-    echo "---------------------------------------------"
-    echo "Generating certificate with subject field: ${SERVER_CERT_SUBJECT}"
-    echo "---------------------------------------------"
-    docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
-        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
-        /usr/src/secrets/generate-keystore.sh \
-        "${SERVER_CERT_SUBJECT}" "${NIFI_KEYSTORE_PASS}"
-    echo "---------------------------------------------"
-    echo "Keystore generation finished!"
-    echo "---------------------------------------------"
-else
+if [ -f ./secrets/keystore.jks ]; then
     echo -n "keystore.jks detected. Please provide the password for the the keystore: "
     read -s NIFI_KEYSTORE_PASS
     echo " "
+else
+    NIFI_KEYSTORE_PASS=$(gen_pass)
 fi
+
+if [ -f ./secrets/truststore.jks ]; then
+    echo -n "truststore.jks detected. Please provide the password for the the truststore: "
+    read -s NIFI_TRUSTSTORE_PASS
+    echo " "
+else
+    NIFI_TRUSTSTORE_PASS=$(gen_pass)
+fi
+echo "Please enter the DN of client. It typically has the form \"CN=user, OU=nifi\""
+read -p "IMPORTANT: the SPACE between components must be provided as the example above:" CLIENT_DNAME
+
+# Run the script to generate keystore/truststore, if they don't exist
+docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
+        -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
+        /usr/src/secrets/generate.sh \
+        "${NIFI_KEYSTORE_PASS}" "${CLIENT_DNAME}" "${NIFI_TRUSTSTORE_PASS}"
 
 echo "Setting up .env file..."
 cat << EOF > ./.env
 AUTH=tls
-INITIAL_ADMIN_IDENTITY=${DNAME}
+INITIAL_ADMIN_IDENTITY=${CLIENT_DNAME}
 KEYSTORE_PATH=/opt/secrets/keystore.jks
 KEYSTORE_TYPE=JKS
 KEYSTORE_PASSWORD=${NIFI_KEYSTORE_PASS}
@@ -84,19 +63,19 @@ echo "Setup is done!"
 echo "~~~~~~~~~~~~~~~~~~~~~~~"
 echo "You can now run:"
 echo " "
-echo "  docker build -t secure-nifi ."
+echo "   docker build -t secure-nifi ."
 echo " "
 echo "to build the image. Then use this command to run the container:"
 echo " "
-echo "  docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi"
+echo "   docker run --name secure-nifi --env-file ./.env -p ${NIFI_PORT}:8443 --detach secure-nifi"
 echo " "
 echo "To visit the Nifi UI, you need to import the client key into your browser. The key file is located in:"
 echo " "
-echo "  ./secrets/client.p12"
+echo "   ./secrets/client.p12"
 echo " "
-echo "After importing, you can visit the following URL for the Nifi UI:
+echo "After importing, you can visit the following URL for the Nifi UI:"
 echo " "
-echo "  https://${NIFI_HOST}:${NIFI_PORT}/nifi"
+echo "   https://${NIFI_HOST}:${NIFI_PORT}/nifi"
 echo " "
 echo "Happy flowing!"
 echo " "

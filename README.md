@@ -42,7 +42,9 @@ After Nifi has finished starting up, you can visit Nifi with the following URL:
 #### Security
 1. You can provide your own keystore and truststore. Just name them `keystore.jks` and `truststore.jks` respectively and put them into `./nifi/screts`. Then follow the quick start instruction.
 
-2. The repository also comes with scripts to help you import existing cert file into truststore. Put your cert file (`DER` format) into `./secrets` and run the following command:
+2. If a new `keystore.jks` is generated, a matching truststore `external_truststore.jks` would also be generated. This truststore is intended to be used in another Nifi instance to communicate securely with the one you are launching.  
+
+3. The repository also comes with scripts to help you import existing cert file into truststore. Put your cert file (`DER` format) into `./secrets` and run the following command:
     ```bash
     docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
         -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
