@@ -165,10 +165,10 @@ if [ ! -z "${TRUSTSTORE}" -a ! -f "${TRUSTSTORE}" ]; then
 fi
 
 # If both --keystore and --new-keystore is specified, ignore --new-keystore
-if [ ! -z "${KEYSTORE}" -o ! -z "${NEW_KEYSTORE}" ]; then
+if [ ! -z "${KEYSTORE}" -a ! -z "${NEW_KEYSTORE}" ]; then
     unset NEW_KEYSTORE
 fi
-if [ ! -z "${TRUSTSTORE}" -o ! -z "${NEW_TRUSTSTORE}" ]; then
+if [ ! -z "${TRUSTSTORE}" -a ! -z "${NEW_TRUSTSTORE}" ]; then
     unset NEW_TRUSTSTORE
 fi
 
