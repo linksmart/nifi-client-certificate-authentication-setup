@@ -85,18 +85,19 @@ done
 set -- "${POSITIONAL[@]}" # restore positional parameters
 
 print_help(){
-    echo << EOF
+
+    cat << EOF
 
     This script generate appropriate configuration and keystore/truststore for a secure Nifi instance.
 
     USAGE: ./setup.sh [OPTIONS]
 
-    Example: ./setup.sh -n host-01 -p 8443 -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
+    Example: ./setup.sh -n host-01 -p 8443 --new-keystore --new-truststore -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
 
     OPTIONS:
 
 EOF
-    echo << EOF | column -s"|" -t
+    cat << EOF | column -s"|" -t
     -h, --help:|Show the help message.
     -n, --hostname HOSTNAME:|Required. The hostname of machine hosting the Nifi container.
     -p, --port PORT:|Required. The forwarded port to the Nifi UI.
@@ -218,7 +219,7 @@ NIFI_WEB_HTTP_HOST=${NIFI_HOST}
 NIFI_REMOTE_INPUT_HOST=${NIFI_HOST}
 EOF
 
-echo << EOF
+cat << EOF
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             Setup is done!
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
