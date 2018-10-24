@@ -7,11 +7,34 @@ browsers with the trusted client certificate can visit the Nifi UI. Username-pas
 ## Quick Start
 Run the interactive setup script to generate necessary configurations:
 ```
-./setup.sh
+./setup.sh -n host-01 -p 8443 --new-keystore --new-truststore -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
+
+    USAGE: ./setup.sh [OPTIONS] [ARGUMENTS]
+
+    Example: ./setup.sh -n host-01 -p 8443 --new-keystore --new-truststore -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
+
+    OPTIONS:
+    
+    -h, --help:               Show the help message.
+    -n, --hostname HOSTNAME:  Required. The hostname of machine hosting the Nifi container.
+    -p, --port PORT:          Required. The forwarded port to the Nifi UI.
+    --keystore FILE:          Optional. The keystore file to be used in Nifi. If this argument is set, --keypass must also be set.
+    --new-keystore:           Optional. Create new keystore. Either this flag or --keystore must be specified.
+    --keypass PASSWORD:       Optional. The password to specified keystore or the newly generated one. Must be specified when --keystore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
+    --truststore FILE:        Optional. The truststore file to be used in Nifi. If this argument is set, --trustpass must also be set.
+    --new-truststore:         Optional. Create new truststore. Either this flag or --truststore must be specified.
+    --trustpass PASSWORD:     Optional. The password to the specified truststore or the newly generated one. Must be specified when --truststore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
+    --ext-trust:              Optional. Whether to generate a truststore from the keystore, which is intended to be used by another Nifi instance to communicate securely with this one. Only effective when --new-keystore is specified.
+    --ext-pass PASSWORD:      Optional. The password to the external truststore. If not specified, a random one is used.
+    --client-pass PASSWORD:   Optional. The password to the client key file. If not specified, a random one is used.
+    -s, --server-dn DN:       Optional. The Distinguish Name of the server certificate in keystore (Default: CN=[HOSTNAME],OU=nifi).
+    -c, --client-dn DN:       Optional. The Distinguish Name of the client certificate in truststore. MUST use SPACES to separate domain components (Default: CN=user ,OU=nifi).
+
 ```
 The script will will do the following for you:  
-- If no `truststore.jks` exists inside `./secrets`, it will automatically generate a truststore, as well as a `PKCS12` file, which needs to be imported into browser to visit the Nifi UI;
-- If no `keystore.jks` exists inside `./secrets`, it will prompt you to generate one with self-signed certificate;
+- Generate `keystore.jks` and `truststore.jks` as required;
+- Generate a `external-truststore.jks` matching the `keystore.jks` as required, which is intended to be used in another Nifi instance to communicate with this one securely.
+- If you ask it to generate a new `truststore.jks`, it will also generate a matching `PKCS12` file, which needs to be imported into browser to visit the Nifi UI;
 - It will generate a `.env` file in repository root directory with all properly set environment variables. You need to reference this env file when you run the container.
  
 After the script is run, you can now build the new Nifi image:
@@ -40,11 +63,7 @@ After Nifi has finished starting up, you can visit Nifi with the following URL:
     - `./templates/*.xml`: template files   
 
 #### Security
-1. You can provide your own keystore and truststore. Just name them `keystore.jks` and `truststore.jks` respectively and put them into `./nifi/screts`. Then follow the quick start instruction.
-
-2. If a new `keystore.jks` is generated, a matching truststore `external_truststore.jks` would also be generated. This truststore is intended to be used in another Nifi instance to communicate securely with the one you are launching.  
-
-3. The repository also comes with scripts to help you import existing cert file into truststore. Put your cert file (`DER` format) into `./secrets` and run the following command:
+1. The repository also comes with scripts to help you import existing cert file into truststore. Put your cert file (`DER` format) into `./secrets` and run the following command:
     ```bash
     docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
         -w /usr/src/secrets --user ${UID} openjdk:8-alpine \
