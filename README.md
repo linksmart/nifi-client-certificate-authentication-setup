@@ -28,7 +28,7 @@ Run the setup script to generate necessary configurations:
         --ext-pass PASSWORD:      Optional. The password to the external truststore. If not specified, a random one is used.
         --client-pass PASSWORD:   Optional. The password to the client key file. If not specified, a random one is used.
         -s, --server-dn DN:       Optional. The Distinguish Name of the server certificate in keystore (Default: CN=[HOSTNAME],OU=nifi).
-        -c, --client-dn DN:       Optional. The Distinguish Name of the client certificate in truststore. MUST use SPACES to separate domain components (Default: CN=user ,OU=nifi).
+        -c, --client-dn DN:       Optional. The Distinguish Name of the client certificate in truststore. MUST use SPACES to separate domain components (Default: CN=user ,OU=nifi). If --truststore is specified, this argument must also be provided.
 ```
 The script will will do the following for you:  
 - Generate `keystore.jks` and `truststore.jks` as required;
