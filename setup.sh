@@ -1,37 +1,5 @@
 #!/bin/bash -e
 
-print_help(){
-
-    cat << EOF
-
-    This script generate appropriate configuration and keystore/truststore for a secure Nifi instance.
-
-    USAGE: ./setup.sh [OPTIONS] [ARGUMENTS]
-
-    EXAMPLE: ./setup.sh -n host-01 -p 8443 --new-keystore --new-truststore -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
-
-    OPTIONS:
-
-EOF
-    cat << EOF | column -s"|" -t
-        -h, --help:|Show the help message.
-        -n, --hostname HOSTNAME:|Required. The hostname of machine hosting the Nifi container.
-        -p, --port PORT:|Required. The forwarded port to the Nifi UI.
-        --keystore FILE:|Optional. The keystore file to be used in Nifi. If this argument is set, --keypass must also be set.
-        --new-keystore:|Optional. Create new keystore. Either this flag or --keystore must be specified.
-        --keypass PASSWORD:|Optional. The password to specified keystore or the newly generated one. Must be specified when --keystore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
-        --truststore FILE:|Optional. The truststore file to be used in Nifi. If this argument is set, --trustpass must also be set.
-        --new-truststore:|Optional. Create new truststore. Either this flag or --truststore must be specified.
-        --trustpass PASSWORD:|Optional. The password to the specified truststore or the newly generated one. Must be specified when --truststore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
-        --ext-trust:|Optional. Whether to generate a truststore from the keystore, which is intended to be used by another Nifi instance to communicate securely with this one.
-        --ext-pass PASSWORD:|Optional. The password to the external truststore. If not specified, a random one is used.
-        --client-pass PASSWORD:|Optional. The password to the client key file. If not specified, a random one is used.
-        -s, --server-dn DN:|Optional. The Distinguish Name of the server certificate in keystore (Default: CN=[HOSTNAME],OU=nifi).
-        -c, --client-dn DN:|Optional. The Distinguish Name of the client certificate in truststore. MUST use SPACES to separate domain components (Default: CN=user ,OU=nifi).
-EOF
-
-}
-
 cat << EOF
      ----------------------------------------------
     |                                              |
@@ -116,8 +84,46 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+print_help(){
+
+    cat << EOF
+
+    This script generate appropriate configuration and keystore/truststore for a secure Nifi instance.
+
+    USAGE: ./setup.sh [OPTIONS] [ARGUMENTS]
+
+    EXAMPLE: ./setup.sh -n host-01 -p 8443 --new-keystore --new-truststore -c "CN=admin, OU=nifi" -s "CN=host-01,OU=nifi"
+
+    OPTIONS:
+
+EOF
+    cat << EOF | column -s"|" -t
+        -h, --help:|Show the help message.
+        -n, --hostname HOSTNAME:|Required. The hostname of machine hosting the Nifi container.
+        -p, --port PORT:|Required. The forwarded port to the Nifi UI.
+        --keystore FILE:|Optional. The keystore file to be used in Nifi. If this argument is set, --keypass must also be set.
+        --new-keystore:|Optional. Create new keystore. Either this flag or --keystore must be specified.
+        --keypass PASSWORD:|Optional. The password to specified keystore or the newly generated one. Must be specified when --keystore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
+        --truststore FILE:|Optional. The truststore file to be used in Nifi. If this argument is set, --trustpass must also be set.
+        --new-truststore:|Optional. Create new truststore. Either this flag or --truststore must be specified.
+        --trustpass PASSWORD:|Optional. The password to the specified truststore or the newly generated one. Must be specified when --truststore is set and must match the password of the specified keystore file. If not specified, a random one will be used.
+        --ext-trust:|Optional. Whether to generate a truststore from the keystore, which is intended to be used by another Nifi instance to communicate securely with this one.
+        --ext-pass PASSWORD:|Optional. The password to the external truststore. If not specified, a random one is used.
+        --client-pass PASSWORD:|Optional. The password to the client key file. If not specified, a random one is used.
+        -s, --server-dn DN:|Optional. The Distinguish Name of the server certificate in keystore (Default: CN=[HOSTNAME],OU=nifi).
+        -c, --client-dn DN:|Optional. The Distinguish Name of the client certificate in truststore. MUST use SPACES to separate domain components (Default: CN=user ,OU=nifi).
+EOF
+
+}
+
 gen_pass(){
     echo $(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+}
+
+gen_file(){
+    TEMPLATE="$(cat $1)"
+    TEMPLATE=$(sed 's/\([^\\]\)"/\1\\"/g; s/^"/\\"/g' <<< "$TEMPLATE")
+    eval "echo \"${TEMPLATE}\" > $2"
 }
 
 # Check the correctness of arguments
@@ -216,19 +222,7 @@ docker run -it --rm -v "$PWD/secrets":/usr/src/secrets \
 
 
 echo "Setting up .env file..."
-cat << EOF > ./.env
-AUTH=tls
-INITIAL_ADMIN_IDENTITY=${CLIENT_DN}
-KEYSTORE_PATH=/opt/secrets/keystore.jks
-KEYSTORE_TYPE=JKS
-KEYSTORE_PASSWORD=${KEYSTORE_PASS}
-TRUSTSTORE_PATH=/opt/secrets/truststore.jks
-TRUSTSTORE_PASSWORD=${TRUSTSTORE_PASS}
-TRUSTSTORE_TYPE=JKS
-NIFI_WEB_PROXY_HOST=${NIFI_HOST}:${NIFI_PORT}
-NIFI_WEB_HTTP_HOST=${NIFI_HOST}
-NIFI_REMOTE_INPUT_HOST=${NIFI_HOST}
-EOF
+gen_file "./templates/.env" "./.env"
 
 cat << EOF
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
